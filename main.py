@@ -48,6 +48,10 @@ def detik_scraper(index):
   article_list = soup.find_all('article', class_='list-content__item')
   
   for article in article_list:
+    identical_article_amount = Article.objects(link_to_origin=article.a["href"]).count()
+    if identical_article_amount > 0:
+      break
+
     html_content = requests.get(article.a["href"])
 
     print("get link {}".format(article.a["href"]))
@@ -60,51 +64,65 @@ def detik_scraper(index):
     for i in range(len(soup.find_all('p', class_='para_caption'))):
       soup.find('p', class_='para_caption').decompose()
 
-    processed_headline = (soup.find('h1', class_='detail__title')).text.strip().replace("\n", "")
     headline = {
-      "id": processed_headline,
-      "en": translator.translate(processed_headline)
+      "id": (soup.find('h1', class_='detail__title')).text.strip().replace("\n", ""),
+      "en": ''
     }
 
-    print("generate headline")
-
-    processed_content = (' '.join([p.text for p in soup.find_all('p')])).strip()
-    en_processed_content = (' '.join([translator.translate(p.text) for p in soup.find_all('p')])).strip()
     content = {
-      "id": processed_content,
-      "en": en_processed_content
+      "id": (' '.join([p.text for p in soup.find_all('p')])).strip(),
+      "en": ''
     }
-
-    print("generate content")
 
     formatted_prompt = "{prompt}\ntitle : {title}\ncontent : {content}"
-    response = openai.ChatCompletion.create(
-      model="gpt-3.5-turbo",
-      messages=[
-        {
-          "role": "system",
-          "content": formatted_prompt.format(
-            prompt=os.environ.get("PROMPT"),
-            title=headline["id"],
-            content=content["id"]
-          )
-        }
-      ]
-    )
+    gpt_executed = False
 
-    print("gpt process")
+    while not gpt_executed:
+      try:
+        response = openai.ChatCompletion.create(
+          model="gpt-3.5-turbo",
+          messages=[
+            {
+              "role": "system",
+              "content": formatted_prompt.format(
+                prompt=os.environ.get("PROMPT"),
+                title=headline["id"],
+                content=content["id"]
+              )
+            }
+          ]
+        )
 
-    data_obj = json.loads(response.choices[0].message.content)
+        data_obj = json.loads(response.choices[0].message.content)
+        gpt_executed = True
+        print("gpt processed")
+      except Exception as e:
+        print(f"failed : {e}")
+        sleep(1)
 
     summary = {
       "id": data_obj["summary"],
-      "en": translator.translate(data_obj["summary"])
+      "en": ''
     }
 
-    category = translator.translate(data_obj["category"])
+    category = data_obj["category"]
 
     date_string, timezone = (soup.find('div', class_='detail__date')).string.rsplit(' ', 1)
-    date_string = translator.translate(date_string)
+
+    translation_executed = False
+
+    while not translation_executed:
+      try:
+        headline["en"] = translator.translate(headline["id"])
+        content["en"]  = (' '.join([translator.translate(p.text) for p in soup.find_all('p')])).strip()
+        summary["en"]  = translator.translate(data_obj["summary"])
+        date_string = translator.translate(date_string)
+        translation_executed = True
+        print("translation processed")
+      except Exception as e:
+        print(f"failed : {e}")
+        sleep(1)
+
     date_format = "%d %b %Y %H:%M"
     date = datetime.strptime((date_string.split(", "))[1], date_format)
 
@@ -124,7 +142,6 @@ def detik_scraper(index):
     after_process_article.save()
 
     print("data saved")
-
     sleep(30)
   return detik_scraper(index - 1)
 
