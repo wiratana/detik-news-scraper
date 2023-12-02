@@ -124,7 +124,7 @@ def detik_scraper(index):
         sleep(1)
 
     date_format = "%d %b %Y %H:%M"
-    date = datetime.strptime((date_string.split(", "))[1], date_format)
+    date = datetime.strptime((date_string.split(" "))[1], date_format)
 
     article = {
       "headline": Headline(**headline),
