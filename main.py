@@ -1,4 +1,5 @@
 import json
+import random
 from time import sleep
 
 from bs4 import BeautifulSoup #import beautiful soup
@@ -123,11 +124,19 @@ def detik_scraper(index):
         print(f"failed : {e}")
         sleep(1)
 
-    date_format = "%d %b %Y %H:%M"
+    date_formats = ["%d %b %Y %H:%M", "%b %d %Y %H:%M"]
     date_string = (date_string.split(" "))
     del date_string[0]
     date_string = " ".join(date_string)
-    date = datetime.strptime(date_string, date_format)
+    date_formating = False
+
+    while not date_formating:
+      try:
+        date = datetime.strptime(date_string, random.choice(date_formats))
+        date_formating = True
+      except Exception as e:
+        print(f"failed : {e}")
+        sleep(1)
 
     article = {
       "headline": Headline(**headline),
