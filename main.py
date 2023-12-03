@@ -124,19 +124,20 @@ def detik_scraper(index):
         print(f"failed : {e}")
         sleep(1)
 
-    date_formats = ["%d %b %Y %H:%M", "%b %d %Y %H:%M"]
+    date_formats = ["%d %b %Y %H:%M", "%b %d %Y %H:%M", "%b %d, %Y %H:%M"]
     date_string = (date_string.split(" "))
     del date_string[0]
     date_string = " ".join(date_string)
     date_formating = False
+    format_index = len(date_formats) - 1
 
     while not date_formating:
       try:
-        date = datetime.strptime(date_string, random.choice(date_formats))
+        date = datetime.strptime(date_string, date_formats[format_index])
         date_formating = True
       except Exception as e:
         print(f"failed : {e}")
-        sleep(1)
+        format_index = format_index - 1
 
     article = {
       "headline": Headline(**headline),
@@ -154,7 +155,6 @@ def detik_scraper(index):
     after_process_article.save()
 
     print("data saved")
-    sleep(30)
   return detik_scraper(index - 1)
 
 def main():
