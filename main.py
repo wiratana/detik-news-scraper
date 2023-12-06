@@ -44,9 +44,9 @@ def detik_scraper(index):
   if index == 0:
     return 0
 
-  html_content = requests.get('https://www.detik.com/bali/hukum-kriminal/indeks/{index}'.format(index=index))
+  html_content = requests.get('https://www.detik.com/tag/bencana-alam/?page={index}'.format(index=index))
   soup = BeautifulSoup(html_content.content, 'lxml')
-  article_list = soup.find_all('article', class_='list-content__item')
+  article_list = soup.find_all('article')
   
   for article in article_list:
     identical_article_amount = Article.objects(link_to_origin=article.a["href"]).count()
@@ -60,6 +60,9 @@ def detik_scraper(index):
     soup = BeautifulSoup(html_content.content, 'lxml')
 
     print("parse html")
+    
+    if soup.find("h3", class_="detail__subtitle"):
+      break
 
     # pre process cleansing
     for i in range(len(soup.find_all('p', class_='para_caption'))):
@@ -74,6 +77,8 @@ def detik_scraper(index):
       "id": (' '.join([p.text for p in soup.find_all('p')])).strip(),
       "en": ''
     }
+
+    date_string, timezone = (soup.find('div', class_='detail__date')).string.rsplit(' ', 1)
 
     formatted_prompt = "{prompt}\ntitle : {title}\ncontent : {content}"
     gpt_executed = False
@@ -108,14 +113,13 @@ def detik_scraper(index):
 
     category = data_obj["category"]
 
-    date_string, timezone = (soup.find('div', class_='detail__date')).string.rsplit(' ', 1)
 
     translation_executed = False
 
     while not translation_executed:
       try:
         headline["en"] = translator.translate(headline["id"])
-        content["en"]  = (' '.join([translator.translate(p.text) for p in soup.find_all('p')])).strip()
+        content["en"]  = (' '.join([translator.translate(p.text) if p is not None else "" for p in soup.find_all('p')])).strip()
         summary["en"]  = translator.translate(data_obj["summary"])
         date_string = translator.translate(date_string)
         translation_executed = True
@@ -137,7 +141,8 @@ def detik_scraper(index):
         date_formating = True
       except Exception as e:
         print(f"failed : {e}")
-        format_index = format_index - 1
+        format_index = format_index - 1 if format_index > 0 else format_index
+        print(date_string)
 
     article = {
       "headline": Headline(**headline),
@@ -159,7 +164,8 @@ def detik_scraper(index):
 
 def main():
   connect(db=os.environ.get("DB_NAME"),host=os.environ.get("DB_URI"))
-  detik_scraper(100)
+  while True:
+    detik_scraper(25)
 
 if __name__ == "__main__":
   main()
